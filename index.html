@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Monthly HR Report Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<!-- SheetJS 엑셀 파싱 라이브러리 -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<!-- QR 코드 생성 라이브러리 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  :root{
+    --ink:#1B2430;
+    --ink-soft:#2A3444;
+    --paper:#F7F4EE;
+    --card:#FFFFFF;
+    --teal:#2F6F6C;
+    --teal-soft:#E4EEEC;
+    --amber:#B8862E;
+    --amber-soft:#F3E7D0;
+    --slate:#6B7280;
+    --hair:#DCD6C9;
+    --danger:#B3492E;
+    --danger-soft:#F6E4DE;
+    --good:#2F6F6C;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;}
+  .app{display:flex;height:100vh;min-height:560px;}
+
+  .sidebar{width:260px;min-width:220px;background:var(--ink);color:#EDE9DF;display:flex;flex-direction:column;padding:28px 18px;}
+  .brand{font-family:'Source Serif 4',serif;font-weight:700;font-size:20px;margin:0 0 2px 4px;}
+  .brand-sub{font-size:12px;color:#9CA6B5;margin:0 0 22px 4px;}
+  .add-row{display:flex;gap:6px;margin-bottom:18px;}
+  .add-row input[type=month]{flex:1;background:#101722;border:1px solid #3A4557;color:#EDE9DF;border-radius:6px;padding:8px 8px;font-family:'JetBrains Mono',monospace;font-size:13px;}
+  .add-row button{background:var(--amber);color:#1B2430;border:none;border-radius:6px;padding:0 12px;font-weight:700;cursor:pointer;font-size:13px;}
+  .add-row button:hover{filter:brightness(1.08);}
+  .month-list{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:4px;padding-right:2px;margin-bottom:18px;}
+  .month-tab{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px 8px 8px 2px;cursor:pointer;border:1px solid transparent;}
+  .month-tab .dot{width:6px;height:6px;border-radius:50%;background:#4A5568;flex:none;}
+  .month-tab.has-data .dot{background:var(--teal-soft);}
+  .month-tab .label{font-family:'JetBrains Mono',monospace;font-size:13px;color:#CBD3DE;}
+  .month-tab.active{background:var(--ink-soft);border-color:#3A4557;}
+  .month-tab.active .label{color:#fff;font-weight:700;}
+  .month-tab:hover{background:var(--ink-soft);}
+  .empty-hint{color:#7B879A;font-size:12px;padding:8px 6px;line-height:1.6;}
+
+  /* 좌측 하단 QR 코드 영역 */
+  .qr-card {
+    background: #101722;
+    border: 1px solid #3A4557;
+    border-radius: 10px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    margin-top: auto;
+  }
+  .qr-card-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: #9CA6B5;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .qr-box {
+    background: #FFFFFF;
+    padding: 8px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  /* canvas는 숨겨서 2개로 보이는 문제 방지, img 태그만 노출 */
+  .qr-box canvas {
+    display: none !important;
+  }
+  .qr-box img {
+    display: block !important;
+  }
+
+  .main{flex:1;overflow-y:auto;padding:34px 42px 60px;}
+  .empty-state{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;height:70%;color:var(--slate);}
+  .empty-state h2{font-family:'Source Serif 4',serif;color:var(--ink);}
+
+  .main-header{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:26px;flex-wrap:wrap;gap:10px;}
+  .main-title{font-family:'Source Serif 4',serif;font-weight:700;font-size:26px;margin:0;}
+  .save-area{display:flex;align-items:center;gap:12px;}
+  .save-status{font-size:12px;color:var(--slate);min-width:100px;text-align:right;}
+  .btn{border:none;border-radius:7px;padding:10px 18px;font-weight:700;font-size:13px;cursor:pointer;font-family:'Inter',sans-serif;}
+  .btn-ghost{background:transparent;color:var(--ink);border:1px solid #C7BFA9;}
+  .btn-ghost:hover{background:#EFEADB;}
+
+  .section-label{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--teal);font-weight:700;margin:0 0 16px;display:flex;align-items:center;gap:8px;}
+  .section-label::after{content:"";flex:1;height:1px;background:var(--hair);}
+
+  .excel-upload-btn-main{
+    background: var(--paper);
+    border: 1px dashed var(--teal);
+    color: var(--teal);
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+  }
+  .excel-upload-btn-main:hover{
+    background: var(--teal-soft);
+    border-style: solid;
+  }
+
+  /* 차트 영역 그리드 */
+  .charts-grid{display:grid;grid-template-columns:repeat(auto-fit, minmax(320px,1fr));gap:18px;margin-bottom:34px;}
+  .chart-card{background:var(--card);border:1px solid var(--hair);border-radius:10px;padding:20px;}
+  .chart-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;}
+  .chart-title{font-size:14px;font-weight:700;color:var(--ink);}
+  
+  .budget-badge-group{display:flex;gap:6px;font-family:'JetBrains Mono',monospace;font-size:11px;}
+  .budget-badge{background:var(--paper);border:1px solid var(--hair);padding:3px 8px;border-radius:5px;color:var(--slate);}
+  .budget-badge.actual{background:var(--teal-soft);border-color:transparent;color:var(--teal);font-weight:700;}
+
+  .chart-empty{color:var(--slate);font-size:12px;padding:30px 0;text-align:center;}
+
+  /* ===== MONTHLY Highlights 표 스타일 ===== */
+  .highlights-table-wrap {
+    background: var(--card);
+    border: 1px solid var(--hair);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+  .highlights-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .highlights-table th {
+    background: var(--paper);
+    color: var(--ink);
+    font-weight: 700;
+    text-align: left;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--hair);
+  }
+  .highlights-table td {
+    padding: 16px;
+    border-bottom: 1px solid var(--hair);
+    vertical-align: top;
+  }
+  .highlights-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .cat-header-cell {
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--teal);
+    width: 180px;
+  }
+  .cat-header-sub {
+    font-size: 11px;
+    color: var(--slate);
+    font-weight: 400;
+    margin-top: 2px;
+  }
+
+  .summary-textarea {
+    width: 100%;
+    min-height: 90px;
+    border: 1px solid var(--hair);
+    border-radius: 6px;
+    padding: 8px 10px;
+    resize: vertical;
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--ink);
+    background: var(--paper);
+  }
+  .summary-textarea:focus { outline: none; border-color: var(--teal); }
+
+  /* 이미지 첨부 영역 */
+  .image-attach-area {
+    margin-top: 10px;
+  }
+  .img-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .img-thumb-container {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid var(--hair);
+  }
+  .img-thumb-container img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .img-thumb-container .img-del-btn {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    background: rgba(0,0,0,0.6);
+    color: #fff;
+    border: none;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
+  .add-img-btn {
+    background: var(--paper);
+    border: 1px dashed var(--hair);
+    color: var(--slate);
+    padding: 4px 10px;
+    border-radius: 5px;
+    font-size: 11px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-weight: 600;
+  }
+  .add-img-btn:hover { border-color: var(--teal); color: var(--teal); }
+
+  .hint{font-size:11px;color:var(--slate);margin:-4px 0 24px;}
+
+  input:disabled, textarea:disabled, button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed !important;
+  }
+
+  ::-webkit-scrollbar{width:8px;}
+  ::-webkit-scrollbar-thumb{background:#C9C2AE;border-radius:4px;}
+  .month-list::-webkit-scrollbar-thumb{background:#3A4557;}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="sidebar">
+    <p class="brand">HR Monthly Report</p>
+    <p class="brand-sub">Dashboard by month</p>
+    <div class="add-row">
+      <input type="month" id="newMonthInput">
+      <button id="addMonthBtn">Add</button>
+    </div>
+    <div class="month-list" id="monthList"></div>
+
+    <!-- 좌측 하단 QR 코드 카드 -->
+    <div class="qr-card">
+      <span class="qr-card-title">Scan to View</span>
+      <div class="qr-box" id="qrcode"></div>
+    </div>
+  </div>
+  <div class="main" id="main">
+    <div class="empty-state"><h2>Loading…</h2></div>
+  </div>
+</div>
+
+<script>
+const monthListEl = document.getElementById('monthList');
+const mainEl = document.getElementById('main');
+const newMonthInput = document.getElementById('newMonthInput');
+const addMonthBtn = document.getElementById('addMonthBtn');
+
+let months = [];
+let dataCache = {};
+let currentMonth = null;
+let saveTimer = null;
+let isEditing = true;
+
+const MONTH_NAMES_ENG = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+
+let config = {
+  topMetrics: [
+    { id: 'hc', label: 'Headcount (HC)', type: 'budget_actual' },
+    { id: 'efficiency', label: 'Efficiency (%)', type: 'budget_actual' }
+  ],
+  categories: [
+    { key: 'cb', short: 'C&B', full: 'Compensation & Benefits' },
+    { key: 'ld', short: 'L&D', full: 'Learning & Development' },
+    { key: 'ta', short: 'TA', full: 'Talent Acquisition' }
+  ]
+};
+
+function uid(){ return Math.random().toString(36).slice(2,9); }
+
+function monthLabel(m){
+  const [y, mo] = m.split('-');
+  return `${MONTH_NAMES_ENG[parseInt(mo,10)-1]} ${y}`;
+}
+
+function escapeHtml(str){
+  const div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
+}
+
+/* ---------- LocalStorage 저장소 ---------- */
+async function loadConfig(){
+  try{
+    const res = localStorage.getItem('config');
+    if(res){
+      const parsed = JSON.parse(res);
+      if(parsed.topMetrics && parsed.categories) config = parsed;
+    }
+  }catch(e){ }
+}
+
+async function saveConfig(){
+  try{ localStorage.setItem('config', JSON.stringify(config)); }catch(e){}
+}
+
+async function loadIndex(){
+  try{
+    const res = localStorage.getItem('months-index');
+    months = res ? JSON.parse(res) : [];
+  }catch(e){ months = []; }
+  months.sort().reverse();
+}
+
+async function saveIndex(){
+  try{ localStorage.setItem('months-index', JSON.stringify(months)); }catch(e){}
+}
+
+function freshMonthData(monthKey){
+  const topValues = {};
+  const is2026 = monthKey && monthKey.startsWith('2026');
+
+  config.topMetrics.forEach(m=>{
+    if(m.type === 'budget_actual'){
+      let defaultBudget = '';
+      if(is2026){
+        if(m.id === 'hc' || m.label.toLowerCase().includes('headcount')) defaultBudget = '84';
+        if(m.id === 'efficiency' || m.label.toLowerCase().includes('efficiency')) defaultBudget = '116';
+      }
+      topValues[m.id] = { budget: defaultBudget, actual: '' };
+    } else {
+      topValues[m.id] = { value: '' };
+    }
+  });
+
+  const categories = {};
+  config.categories.forEach(c=>{ categories[c.key] = { summary: '', images: [] }; });
+  return { topValues, categories };
+}
+
+function normalizeMonthData(raw, monthKey){
+  const fresh = freshMonthData(monthKey);
+  const data = raw ? JSON.parse(JSON.stringify(raw)) : {};
+  data.topValues = data.topValues || {};
+  data.categories = data.categories || {};
+  
+  const is2026 = monthKey && monthKey.startsWith('2026');
+
+  config.topMetrics.forEach(m=>{
+    if(!data.topValues[m.id]) {
+      data.topValues[m.id] = fresh.topValues[m.id];
+    } else if(is2026 && m.type === 'budget_actual') {
+      if(!data.topValues[m.id].budget){
+        if(m.id === 'hc' || m.label.toLowerCase().includes('headcount')) data.topValues[m.id].budget = '84';
+        if(m.id === 'efficiency' || m.label.toLowerCase().includes('efficiency')) data.topValues[m.id].budget = '116';
+      }
+    }
+  });
+
+  config.categories.forEach(c=>{
+    if(!data.categories[c.key]) {
+      data.categories[c.key] = { summary: '', images: [] };
+    } else {
+      if(!data.categories[c.key].images) data.categories[c.key].images = [];
+    }
+  });
+  return data;
+}
+
+async function loadMonth(m){
+  if(dataCache[m]) return dataCache[m];
+  try{
+    const res = localStorage.getItem('report:'+m);
+    const parsed = res ? JSON.parse(res) : null;
+    dataCache[m] = normalizeMonthData(parsed, m);
+  }catch(e){
+    dataCache[m] = freshMonthData(m);
+  }
+  return dataCache[m];
+}
+
+async function saveMonth(m){
+  try{
+    localStorage.setItem('report:'+m, JSON.stringify(dataCache[m]));
+    setSaveStatus('Saved · ' + new Date().toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'}));
+  }catch(e){
+    setSaveStatus('Save failed — try again');
+  }
+}
+
+function queueSave(m){
+  setSaveStatus('Saving…');
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(()=>{ saveMonth(m); }, 600);
+}
+
+function setSaveStatus(text){
+  const el = document.querySelector('.save-status');
+  if(el) el.textContent = text;
+}
+
+function toggleFormState(disabled){
+  const inputs = document.querySelectorAll('.main input, .main textarea, .main button:not(#editBtn):not(#saveBtn):not(#mainExcelUploadBtn)');
+  inputs.forEach(el => {
+    el.disabled = disabled;
+  });
+}
+
+/* ---------- QR 코드 생성 함수 (중복 생성 및 2개 노출 방지 처리) ---------- */
+function initQRCode() {
+  const qrBox = document.getElementById('qrcode');
+  if (!qrBox) return;
+  
+  // 기존 내부 요소 완전 삭제
+  qrBox.innerHTML = '';
+  
+  const pageUrl = window.location.href;
+  
+  if (typeof QRCode !== 'undefined') {
+    new QRCode(qrBox, {
+      text: pageUrl,
+      width: 105,
+      height: 105,
+      colorDark : "#1B2430",
+      colorLight : "#ffffff",
+      correctLevel : QRCode.CorrectLevel.H
+    });
+  }
+}
+
+/* ---------- 엑셀 업로드 파싱 ---------- */
+async function handleCombinedExcelUpload(file) {
+  if (typeof XLSX === 'undefined') {
+    alert("엑셀 라이브러리가 준비되지 않았습니다.");
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: 'array' });
+      
+      let targetSheetName = workbook.SheetNames.find(name => name.toLowerCase().includes('forecast'));
+      if (!targetSheetName) targetSheetName = workbook.SheetNames[0];
+      
+      const worksheet = workbook.Sheets[targetSheetName];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+      
+      const row8 = jsonData[7] || [];
+      const row10 = jsonData[9] || [];
+      
+      const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+      const targetYear = currentMonth ? currentMonth.split('-')[0] : '2026';
+
+      let monthCols = {};
+
+      for (let r = 0; r < jsonData.length; r++) {
+        if (!jsonData[r]) continue;
+        for (let c = 0; c < jsonData[r].length; c++) {
+          const cellVal = String(jsonData[r][c] || '').trim().toLowerCase();
+          for (let m = 1; m <= 12; m++) {
+            if (monthCols[m] !== undefined) continue;
+            const mShort = monthNames[m - 1];
+            if (cellVal === `${m}월` || cellVal === `${m}` || cellVal === mShort || cellVal.includes(mShort)) {
+              monthCols[m] = c;
+            }
+          }
+        }
+      }
+
+      function getVal(rowArray, monthNum) {
+        let rawVal = null;
+        const colIdx = monthCols[monthNum];
+        if (colIdx !== undefined && rowArray[colIdx] !== undefined) {
+          rawVal = rowArray[colIdx];
+        } else if (rowArray.length > 0) {
+          const numbers = rowArray.map(v => parseFloat(v)).filter(v => !isNaN(v));
+          if (numbers[monthNum - 1] !== undefined) rawVal = numbers[monthNum - 1];
+        }
+        const parsed = parseFloat(rawVal);
+        return isNaN(parsed) ? null : Math.round(parsed);
+      }
+
+      let importedMonths = [];
+
+      for (let m = 1; m <= 12; m++) {
+        const effValue = getVal(row8, m);
+        const hcValue = getVal(row10, m);
+
+        if (effValue !== null || hcValue !== null) {
+          const monthKey = `${targetYear}-${String(m).padStart(2, '0')}`;
+          if (!months.includes(monthKey)) months.push(monthKey);
+          if (!dataCache[monthKey]) await loadMonth(monthKey);
+
+          const dataObj = dataCache[monthKey];
+          const is2026 = monthKey.startsWith('2026');
+
+          config.topMetrics.forEach(metric => {
+            const isHc = metric.id === 'hc' || metric.label.toLowerCase().includes('headcount');
+            const isEff = metric.id === 'efficiency' || metric.label.toLowerCase().includes('efficiency');
+
+            if (isEff && effValue !== null) {
+              if (typeof dataObj.topValues[metric.id] === 'object' && 'actual' in dataObj.topValues[metric.id]) {
+                dataObj.topValues[metric.id].actual = effValue;
+                if (is2026 && !dataObj.topValues[metric.id].budget) dataObj.topValues[metric.id].budget = '116';
+              } else {
+                dataObj.topValues[metric.id] = { budget: is2026 ? '116' : '', actual: effValue };
+              }
+            }
+
+            if (isHc && hcValue !== null) {
+              if (typeof dataObj.topValues[metric.id] === 'object' && 'actual' in dataObj.topValues[metric.id]) {
+                dataObj.topValues[metric.id].actual = hcValue;
+                if (is2026 && !dataObj.topValues[metric.id].budget) dataObj.topValues[metric.id].budget = '84';
+              } else {
+                dataObj.topValues[metric.id] = { budget: is2026 ? '84' : '', actual: hcValue };
+              }
+            }
+          });
+
+          await saveMonth(monthKey);
+          importedMonths.push(MONTH_NAMES_ENG[m-1]);
+        }
+      }
+
+      months.sort().reverse();
+      await saveIndex();
+
+      if (importedMonths.length > 0) {
+        renderMonthList();
+        renderAllCharts();
+        alert(`[${targetSheetName}] Sheet data successfully imported for (${importedMonths.join(', ')})!`);
+      } else {
+        alert(`Failed to parse month data from '${targetSheetName}' sheet.`);
+      }
+    } catch(err) {
+      alert('Error reading excel file.');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+/* ---------- 렌더링 로직 ---------- */
+
+function renderMonthList(){
+  monthListEl.innerHTML = '';
+  if(months.length === 0){
+    const hint = document.createElement('div');
+    hint.className = 'empty-hint';
+    hint.textContent = 'Pick a month above and click "Add".';
+    monthListEl.appendChild(hint);
+    return;
+  }
+  months.forEach(m=>{
+    const tab = document.createElement('div');
+    tab.className = 'month-tab' + (m === currentMonth ? ' active' : '');
+    const d = dataCache[m];
+    let hasData = false;
+    if(d){
+      hasData = Object.values(d.topValues).some(v => (v.budget||v.actual||v.value)) ||
+        Object.values(d.categories).some(c => c.summary.trim().length > 0);
+    }
+    if(hasData) tab.classList.add('has-data');
+    tab.innerHTML = `<span class="dot"></span><span class="label">${monthLabel(m)}</span>`;
+    tab.onclick = () => selectMonth(m);
+    monthListEl.appendChild(tab);
+  });
+}
+
+async function selectMonth(m){
+  currentMonth = m;
+  await loadMonth(m);
+  renderMonthList();
+  renderMain();
+}
+
+function renderMain(){
+  if(!currentMonth){
+    mainEl.innerHTML = `<div class="empty-state">
+      <h2>No report selected</h2>
+      <p>Add a month on the left to start tracking your metrics.</p>
+    </div>`;
+    return;
+  }
+
+  const [curYear, curMonthNum] = currentMonth.split('-');
+  const startMonthEng = MONTH_NAMES_ENG[0];
+  const curMonthEng = MONTH_NAMES_ENG[parseInt(curMonthNum, 10) - 1];
+
+  mainEl.innerHTML = `
+    <div class="main-header">
+      <h2 class="main-title">${monthLabel(currentMonth)} Report</h2>
+      <div class="save-area">
+        <span class="save-status">${isEditing ? 'Editing…' : 'Saved'}</span>
+        <button class="btn btn-ghost" id="editBtn">Edit</button>
+        <button class="btn" id="saveBtn" style="background:var(--teal); color:#fff;">Save</button>
+      </div>
+    </div>
+
+    <div class="section-label" style="justify-content:space-between;">
+      <span>Monthly Trend (${startMonthEng} ~ ${curMonthEng} ${curYear})</span>
+      <button class="excel-upload-btn-main" id="mainExcelUploadBtn">
+        📂 Excel Import
+      </button>
+      <input type="file" id="mainExcelFileInput" accept=".xlsx, .xls, .csv" style="display:none;">
+    </div>
+
+    <div class="charts-grid" id="chartsGrid"></div>
+
+    <p class="section-label">MONTHLY Highlights</p>
+    <div id="highlightsTableArea"></div>
+    <p class="hint">Click Edit to make changes. Click Save when finished to lock inputs.</p>
+  `;
+
+  document.getElementById('editBtn').onclick = () => {
+    isEditing = true;
+    toggleFormState(false);
+    setSaveStatus('Editing…');
+  };
+
+  document.getElementById('saveBtn').onclick = async () => {
+    if (currentMonth) {
+      await saveMonth(currentMonth);
+      isEditing = false;
+      toggleFormState(true);
+    }
+  };
+
+  const uploadBtn = document.getElementById('mainExcelUploadBtn');
+  const fileInput = document.getElementById('mainExcelFileInput');
+  uploadBtn.onclick = () => fileInput.click();
+  fileInput.onchange = (e) => {
+    if(e.target.files.length > 0){
+      handleCombinedExcelUpload(e.target.files[0]);
+    }
+  };
+
+  renderHighlightsTable();
+  renderAllCharts();
+
+  if(!isEditing) {
+    toggleFormState(true);
+  }
+}
+
+/* ---------- MONTHLY Highlights (2컬럼 표 형식) 렌더링 ---------- */
+function renderHighlightsTable(){
+  const area = document.getElementById('highlightsTableArea');
+  if(!area) return;
+
+  const data = dataCache[currentMonth];
+
+  let html = `
+    <div class="highlights-table-wrap">
+      <table class="highlights-table">
+        <thead>
+          <tr>
+            <th style="width:180px;">Category</th>
+            <th>Monthly Summary & Attachments</th>
+          </tr>
+        </thead>
+        <tbody>
+  `;
+
+  config.categories.forEach(c => {
+    const catData = data.categories[c.key] || { summary: '', images: [] };
+    data.categories[c.key] = catData;
+
+    html += `
+      <tr data-cat-key="${c.key}">
+        <td class="cat-header-cell">
+          <div>${escapeHtml(c.short)}</div>
+          <div class="cat-header-sub">${escapeHtml(c.full)}</div>
+        </td>
+        <td>
+          <textarea class="summary-textarea" placeholder="Enter key accomplishments or notes for ${escapeHtml(c.short)}..." oninput="updateSummary('${c.key}', this.value)">${escapeHtml(catData.summary)}</textarea>
+          
+          <div class="image-attach-area">
+            <button class="add-img-btn" onclick="triggerImgUpload('${c.key}')">📷 Add Image</button>
+            <input type="file" id="imgInput-${c.key}" accept="image/*" style="display:none;" onchange="handleImageUpload('${c.key}', this)">
+            <div class="img-grid" id="imgGrid-${c.key}"></div>
+          </div>
+        </td>
+      </tr>
+    `;
+  });
+
+  html += `
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  area.innerHTML = html;
+
+  config.categories.forEach(c => {
+    renderImagesForCategory(c.key);
+  });
+}
+
+function updateSummary(catKey, val){
+  const catData = dataCache[currentMonth].categories[catKey];
+  catData.summary = val;
+  queueSave(currentMonth);
+}
+
+/* ---------- 이미지 관리 ---------- */
+function triggerImgUpload(catKey){
+  const input = document.getElementById(`imgInput-${catKey}`);
+  if(input) input.click();
+}
+
+function handleImageUpload(catKey, inputEl){
+  if(inputEl.files && inputEl.files[0]){
+    const file = inputEl.files[0];
+    const reader = new FileReader();
+    reader.onload = function(e){
+      const imgDataUrl = e.target.result;
+      const catData = dataCache[currentMonth].categories[catKey];
+      if(!catData.images) catData.images = [];
+      catData.images.push(imgDataUrl);
+      queueSave(currentMonth);
+      renderImagesForCategory(catKey);
+      inputEl.value = '';
+    };
+    reader.readAsDataURL(file);
+  }
+}
+
+function renderImagesForCategory(catKey){
+  const gridEl = document.getElementById(`imgGrid-${catKey}`);
+  if(!gridEl) return;
+  gridEl.innerHTML = '';
+
+  const catData = dataCache[currentMonth].categories[catKey];
+  if(!catData.images) return;
+
+  catData.images.forEach((imgUrl, index) => {
+    const container = document.createElement('div');
+    container.className = 'img-thumb-container';
+    container.innerHTML = `
+      <img src="${imgUrl}" alt="Attached snippet">
+      <button class="img-del-btn" title="Delete image">×</button>
+    `;
+    container.querySelector('.img-del-btn').onclick = () => {
+      catData.images.splice(index, 1);
+      queueSave(currentMonth);
+      renderImagesForCategory(catKey);
+    };
+    gridEl.appendChild(container);
+  });
+}
+
+/* ---------- 차트 및 SVG 렌더링 ---------- */
+
+async function ensureAllMonthsLoaded(){
+  for(const m of months){
+    if(!dataCache[m]) await loadMonth(m);
+  }
+}
+
+function getMetricValue(d, metricDef){
+  if(!d) return { actual: null, budget: null };
+  if(metricDef.type === 'budget_actual'){
+    const v = d.topValues[metricDef.id];
+    if(!v) return { actual: null, budget: null };
+    const act = parseFloat(v.actual);
+    const bdg = parseFloat(v.budget);
+    return {
+      actual: isNaN(act) ? null : act,
+      budget: isNaN(bdg) ? null : bdg
+    };
+  } else if(metricDef.type === 'simple'){
+    const v = d.topValues[metricDef.id];
+    if(!v) return { actual: null, budget: null };
+    const num = parseFloat(v.value);
+    return { actual: isNaN(num) ? null : num, budget: null };
+  }
+  return { actual: null, budget: null };
+}
+
+function renderSingleChartSVG(points, currentBudget){
+  if(!points || points.length === 0){
+    return `<div class="chart-empty">No data available for Jan ~ current month.</div>`;
+  }
+
+  const allVals = points.map(p=>p.actual).concat(currentBudget !== null ? [currentBudget] : []);
+  const max = Math.max(...allVals, 0.0001);
+  
+  const w = 340, h = 150, padL = 10, padB = 22;
+  const count = points.length;
+  const barGap = count > 8 ? 4 : 8;
+  const barW = Math.max(10, (w - padL*2 - barGap*(count-1)) / count);
+  
+  let x = padL;
+  let bars = '';
+  let labels = '';
+  let budgetLine = '';
+
+  if(currentBudget !== null && currentBudget > 0){
+    const budgetY = h - padB - (currentBudget / max) * (h - padB - 28);
+    budgetLine = `
+      <line x1="${padL - 2}" y1="${budgetY}" x2="${w - padL + 2}" y2="${budgetY}" stroke="#B8862E" stroke-width="1.2" stroke-dasharray="3,3" opacity="0.85"></line>
+      <text x="${w - padL}" y="${budgetY - 3}" text-anchor="end" font-family="JetBrains Mono, monospace" font-size="8" font-weight="700" fill="#B8862E">Bdg ${currentBudget}</text>
+    `;
+  }
+
+  const actualFontSize = count > 8 ? "8" : "9.5";
+  const monthFontSize = count > 8 ? "8" : "9";
+
+  points.forEach(p=>{
+    const barH = (p.actual / max) * (h - padB - 28);
+    const y = h - padB - barH;
+    const mIdx = parseInt(p.month.split('-')[1], 10) - 1;
+    const mEng = MONTH_NAMES_ENG[mIdx];
+    
+    bars += `<rect x="${x}" y="${y}" width="${barW}" height="${barH}" rx="2" fill="var(--teal)"></rect>`;
+    bars += `<text x="${x + barW/2}" y="${y - 3}" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="${actualFontSize}" font-weight="700" fill="#2F6F6C">${Math.round(p.actual)}</text>`;
+    labels += `<text x="${x + barW/2}" y="${h - 5}" text-anchor="middle" font-family="Inter, sans-serif" font-size="${monthFontSize}" font-weight="600" fill="#6B7280">${mEng}</text>`;
+    
+    x += barW + barGap;
+  });
+
+  return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto;">
+    <line x1="${padL}" y1="${h-padB}" x2="${w-padL}" y2="${h-padB}" stroke="#DCD6C9" stroke-width="1"></line>
+    ${budgetLine}
+    ${bars}
+    ${labels}
+  </svg>`;
+}
+
+function renderAllCharts(){
+  const container = document.getElementById('chartsGrid');
+  if(!container || !currentMonth) return;
+  container.innerHTML = '';
+
+  const [targetYear, targetMonthStr] = currentMonth.split('-');
+  const targetMonthNum = parseInt(targetMonthStr, 10);
+
+  const filteredMonths = [];
+  for(let m = 1; m <= targetMonthNum; m++){
+    const mKey = `${targetYear}-${String(m).padStart(2, '0')}`;
+    filteredMonths.push(mKey);
+  }
+
+  const curData = dataCache[currentMonth];
+
+  config.topMetrics.forEach(metric => {
+    const card = document.createElement('div');
+    card.className = 'chart-card';
+
+    const points = filteredMonths.map(m => {
+      const val = getMetricValue(dataCache[m], metric);
+      return { month: m, actual: val.actual };
+    }).filter(p => p.actual !== null);
+
+    const curMetricVal = getMetricValue(curData, metric);
+    const curActual = curMetricVal.actual !== null ? Math.round(curMetricVal.actual) : '-';
+    const curBudget = curMetricVal.budget;
+
+    let badgeHtml = '';
+    if(metric.type === 'budget_actual'){
+      const bdgText = curBudget !== null ? curBudget : '-';
+      badgeHtml = `
+        <div class="budget-badge-group">
+          <span class="budget-badge">Bdg: ${bdgText}</span>
+          <span class="budget-badge actual">Act: ${curActual}</span>
+        </div>
+      `;
+    } else {
+      const unitText = metric.unit ? metric.unit : '';
+      badgeHtml = `
+        <div class="budget-badge-group">
+          <span class="budget-badge actual">Act: ${curActual}${unitText}</span>
+        </div>
+      `;
+    }
+
+    card.innerHTML = `
+      <div class="chart-header">
+        <span class="chart-title">${escapeHtml(metric.label)}</span>
+        ${badgeHtml}
+      </div>
+      <div>${renderSingleChartSVG(points, curBudget)}</div>
+    `;
+
+    container.appendChild(card);
+  });
+}
+
+/* ---------- 초기화 ---------- */
+
+addMonthBtn.addEventListener('click', async ()=>{
+  const val = newMonthInput.value;
+  if(!val) return;
+  if(!months.includes(val)){
+    months.push(val);
+    months.sort().reverse();
+    await saveIndex();
+    await loadMonth(val);
+  }
+  newMonthInput.value = '';
+  isEditing = true;
+  await selectMonth(val);
+});
+
+(async function init(){
+  await loadConfig();
+  await loadIndex();
+  await ensureAllMonthsLoaded();
+  if(months.length > 0){
+    currentMonth = months[0];
+  }
+  renderMonthList();
+  renderMain();
+  initQRCode(); // 단일 QR 코드만 정상 노출되도록 초기화
+  
+  const now = new Date();
+  newMonthInput.value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+})();
+</script>
+</body>
+</html>
