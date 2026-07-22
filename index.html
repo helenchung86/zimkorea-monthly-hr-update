@@ -707,7 +707,7 @@ function renderImagesForCategory(catKey){
     const container = document.createElement('div');
     container.className = 'img-thumb-container';
     container.innerHTML = `
-      <img src="${imgUrl}" alt="Attached snippet">
+      <img src="${imgUrl}" alt="Attached snippet" class="preview-image">
       <button class="img-del-btn" title="Delete image">×</button>
     `;
     container.querySelector('.img-del-btn').onclick = () => {
