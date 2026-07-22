@@ -572,28 +572,36 @@ async function handleCombinedExcelUpload(file) {
 /* ---------- 렌더링 로직 ---------- */
 
 function renderMonthList(){
-  monthListEl.innerHTML = '';
-  if(months.length === 0){
-    const hint = document.createElement('div');
-    hint.className = 'empty-hint';
-    hint.textContent = 'Pick a month above and click "Add".';
-    monthListEl.appendChild(hint);
-    return;
+  const selectEl = document.getElementById('monthSelect');
+  if(!selectEl || !months || months.length === 0) return;
+  
+  // 오늘 날짜 기준 'YYYY-MM' (예: '2026-07')
+  const now = new Date();
+  const currentYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+  selectEl.innerHTML = '';
+  
+  // 현재 월보다 작거나 같은(과거/당월) 목록만 표시 (데이터가 문자열일 경우 안전하게 처리)
+  let availableMonths = months.filter(m => String(m) <= currentYearMonth);
+
+  // 혹시라도 필터링 결과가 비어있다면 전체 months를 보여주는 안전장치
+  if (availableMonths.length === 0) {
+    availableMonths = months;
   }
-  months.forEach(m=>{
-    const tab = document.createElement('div');
-    tab.className = 'month-tab' + (m === currentMonth ? ' active' : '');
-    const d = dataCache[m];
-    let hasData = false;
-    if(d){
-      hasData = Object.values(d.topValues).some(v => (v.budget||v.actual||v.value)) ||
-        Object.values(d.categories).some(c => c.summary.trim().length > 0);
-    }
-    if(hasData) tab.classList.add('has-data');
-    tab.innerHTML = `<span class="dot"></span><span class="label">${monthLabel(m)}</span>`;
-    tab.onclick = () => selectMonth(m);
-    monthListEl.appendChild(tab);
+
+  availableMonths.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m;
+    opt.textContent = monthLabel(m);
+    opt.style.background = '#1e293b';
+    opt.style.color = '#fff';
+    if(m === currentMonth) opt.selected = true;
+    selectEl.appendChild(opt);
   });
+
+  selectEl.onchange = (e) => {
+    selectMonth(e.target.value);
+  };
 }
 
 async function selectMonth(m){
