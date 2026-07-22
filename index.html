@@ -707,9 +707,13 @@ function renderImagesForCategory(catKey){
     const container = document.createElement('div');
     container.className = 'img-thumb-container';
     container.innerHTML = `
-      <img src="${imgUrl}" alt="Attached snippet" class="preview-image">
-      <button class="img-del-btn" title="Delete image">×</button>
-    `;
+  <img
+      src="${imgUrl}"
+      alt="Attached snippet"
+      class="preview-image"
+      onclick="window.open(this.src, '_blank')">
+  <button class="img-del-btn" title="Delete image">×</button>
+`;
     container.querySelector('.img-del-btn').onclick = () => {
       catData.images.splice(index, 1);
       queueSave(currentMonth);
