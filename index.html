@@ -7,8 +7,6 @@
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <!-- SheetJS 엑셀 파싱 라이브러리 -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<!-- QR 코드 생성 라이브러리 -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
   :root{
     --ink:#1B2430;
@@ -32,53 +30,22 @@
   .sidebar{width:260px;min-width:220px;background:var(--ink);color:#EDE9DF;display:flex;flex-direction:column;padding:28px 18px;}
   .brand{font-family:'Source Serif 4',serif;font-weight:700;font-size:20px;margin:0 0 2px 4px;}
   .brand-sub{font-size:12px;color:#9CA6B5;margin:0 0 22px 4px;}
-  .add-row{display:flex;gap:6px;margin-bottom:18px;}
-  .add-row input[type=month]{flex:1;background:#101722;border:1px solid #3A4557;color:#EDE9DF;border-radius:6px;padding:8px 8px;font-family:'JetBrains Mono',monospace;font-size:13px;}
-  .add-row button{background:var(--amber);color:#1B2430;border:none;border-radius:6px;padding:0 12px;font-weight:700;cursor:pointer;font-size:13px;}
-  .add-row button:hover{filter:brightness(1.08);}
-  .month-list{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:4px;padding-right:2px;margin-bottom:18px;}
-  .month-tab{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px 8px 8px 2px;cursor:pointer;border:1px solid transparent;}
-  .month-tab .dot{width:6px;height:6px;border-radius:50%;background:#4A5568;flex:none;}
-  .month-tab.has-data .dot{background:var(--teal-soft);}
-  .month-tab .label{font-family:'JetBrains Mono',monospace;font-size:13px;color:#CBD3DE;}
-  .month-tab.active{background:var(--ink-soft);border-color:#3A4557;}
-  .month-tab.active .label{color:#fff;font-weight:700;}
-  .month-tab:hover{background:var(--ink-soft);}
-  .empty-hint{color:#7B879A;font-size:12px;padding:8px 6px;line-height:1.6;}
 
-  /* 좌측 하단 QR 코드 영역 */
+  /* 좌측 하단 로고 카드 영역 */
   .qr-card {
-    background: #101722;
-    border: 1px solid #3A4557;
-    border-radius: 10px;
-    padding: 14px;
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 12px;
     display: flex;
-    flex-direction: column;
+    justify-content: center;
     align-items: center;
-    gap: 10px;
     margin-top: auto;
   }
-  .qr-card-title {
-    font-size: 11px;
-    font-weight: 600;
-    color: #9CA6B5;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-  .qr-box {
-    background: #FFFFFF;
-    padding: 8px;
+  .qr-card img {
+    max-width: 100%;
+    height: auto;
+    display: block;
     border-radius: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  /* canvas는 숨겨서 2개로 보이는 문제 방지, img 태그만 노출 */
-  .qr-box canvas {
-    display: none !important;
-  }
-  .qr-box img {
-    display: block !important;
   }
 
   .main{flex:1;overflow-y:auto;padding:34px 42px 60px;}
@@ -249,12 +216,11 @@
 
   ::-webkit-scrollbar{width:8px;}
   ::-webkit-scrollbar-thumb{background:#C9C2AE;border-radius:4px;}
-  .month-list::-webkit-scrollbar-thumb{background:#3A4557;}
 </style>
 </head>
 <body>
 <div class="app">
-  <!-- 사이드바 시작 -->
+  <!-- 사이드바 -->
   <div class="sidebar">
     <p class="brand">ZIM Korea</p>
     <p class="brand-sub">HR Monthly Report</p>
@@ -266,22 +232,21 @@
     </div>
 
     <!-- 로고 카드 -->
-    <div class="qr-card" style="text-align: center; padding: 12px; background: #ffffff; border-radius: 12px; margin-top: auto; display: flex; justify-content: center; align-items: center;">
-      <img src="Picture1.jpg" alt="ZIM" onError="this.onerror=null; this.src='picture1.jpg';" style="max-width: 100%; height: auto; display: block; border-radius: 6px;">
+    <div class="qr-card">
+      <img src="Picture1.jpg" alt="ZIM" onError="this.onerror=null; this.src='picture1.jpg';">
     </div>  
+  </div> <!-- 사이드바 정상 종료 -->
 
-  <!-- 메인 컨텐츠 시작 -->
+  <!-- 메인 컨텐츠 -->
   <div class="main" id="main">
     <div class="empty-state"><h2>Loading…</h2></div>
   </div>
+</div> <!-- App 정상 종료 -->
 
 <script>
-const monthListEl = document.getElementById('monthList');
 const mainEl = document.getElementById('main');
-const newMonthInput = document.getElementById('newMonthInput');
-const addMonthBtn = document.getElementById('addMonthBtn');
 
-let months = [];
+let months = ['2026-07', '2026-06', '2026-05', '2026-04', '2026-03', '2026-02', '2026-01'];
 let dataCache = {};
 let currentMonth = null;
 let saveTimer = null;
@@ -301,9 +266,8 @@ let config = {
   ]
 };
 
-function uid(){ return Math.random().toString(36).slice(2,9); }
-
 function monthLabel(m){
+  if(!m) return '';
   const [y, mo] = m.split('-');
   return `${MONTH_NAMES_ENG[parseInt(mo,10)-1]} ${y}`;
 }
@@ -325,15 +289,14 @@ async function loadConfig(){
   }catch(e){ }
 }
 
-async function saveConfig(){
-  try{ localStorage.setItem('config', JSON.stringify(config)); }catch(e){}
-}
-
 async function loadIndex(){
   try{
     const res = localStorage.getItem('months-index');
-    months = res ? JSON.parse(res) : [];
-  }catch(e){ months = []; }
+    if(res) {
+      const parsed = JSON.parse(res);
+      if(parsed && parsed.length > 0) months = parsed;
+    }
+  }catch(e){ }
   months.sort().reverse();
 }
 
@@ -429,28 +392,6 @@ function toggleFormState(disabled){
   inputs.forEach(el => {
     el.disabled = disabled;
   });
-}
-
-/* ---------- QR 코드 생성 함수 (중복 생성 및 2개 노출 방지 처리) ---------- */
-function initQRCode() {
-  const qrBox = document.getElementById('qrcode');
-  if (!qrBox) return;
-  
-  // 기존 내부 요소 완전 삭제
-  qrBox.innerHTML = '';
-  
-  const pageUrl = window.location.href;
-  
-  if (typeof QRCode !== 'undefined') {
-    new QRCode(qrBox, {
-      text: pageUrl,
-      width: 105,
-      height: 105,
-      colorDark : "#1B2430",
-      colorLight : "#ffffff",
-      correctLevel : QRCode.CorrectLevel.H
-    });
-  }
 }
 
 /* ---------- 엑셀 업로드 파싱 ---------- */
@@ -555,7 +496,7 @@ async function handleCombinedExcelUpload(file) {
       if (importedMonths.length > 0) {
         renderMonthList();
         renderAllCharts();
-        alert(`[${targetSheetName}] Sheet data successfully imported for (${importedMonths.join(', ')})!`);
+        alert(`[${targetSheetName}] Sheet data successfully imported!`);
       } else {
         alert(`Failed to parse month data from '${targetSheetName}' sheet.`);
       }
@@ -570,23 +511,11 @@ async function handleCombinedExcelUpload(file) {
 
 function renderMonthList(){
   const selectEl = document.getElementById('monthSelect');
-  if(!selectEl || !months || months.length === 0) return;
-  
-  // 오늘 날짜 기준 'YYYY-MM' (예: '2026-07')
-  const now = new Date();
-  const currentYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  if(!selectEl) return;
 
   selectEl.innerHTML = '';
-  
-  // 현재 월보다 작거나 같은(과거/당월) 목록만 표시 (데이터가 문자열일 경우 안전하게 처리)
-  let availableMonths = months.filter(m => String(m) <= currentYearMonth);
 
-  // 혹시라도 필터링 결과가 비어있다면 전체 months를 보여주는 안전장치
-  if (availableMonths.length === 0) {
-    availableMonths = months;
-  }
-
-  availableMonths.forEach(m => {
+  months.forEach(m => {
     const opt = document.createElement('option');
     opt.value = m;
     opt.textContent = monthLabel(m);
@@ -612,7 +541,7 @@ function renderMain(){
   if(!currentMonth){
     mainEl.innerHTML = `<div class="empty-state">
       <h2>No report selected</h2>
-      <p>Add a month on the left to start tracking your metrics.</p>
+      <p>Please select a month.</p>
     </div>`;
     return;
   }
@@ -623,7 +552,7 @@ function renderMain(){
 
   mainEl.innerHTML = `
     <div class="main-header">
-      <h2 class="main-title">${monthLabel(currentMonth)} </h2>
+      <h2 class="main-title">${monthLabel(currentMonth)}</h2>
       <div class="save-area">
         <span class="save-status">${isEditing ? 'Editing…' : 'Saved'}</span>
         <button class="btn btn-ghost" id="editBtn">Edit</button>
@@ -677,7 +606,7 @@ function renderMain(){
   }
 }
 
-/* ---------- MONTHLY Highlights (2컬럼 표 형식) 렌더링 ---------- */
+/* ---------- MONTHLY Highlights 렌더링 ---------- */
 function renderHighlightsTable(){
   const area = document.getElementById('highlightsTableArea');
   if(!area) return;
@@ -924,20 +853,6 @@ function renderAllCharts(){
 
 /* ---------- 초기화 ---------- */
 
-addMonthBtn.addEventListener('click', async ()=>{
-  const val = newMonthInput.value;
-  if(!val) return;
-  if(!months.includes(val)){
-    months.push(val);
-    months.sort().reverse();
-    await saveIndex();
-    await loadMonth(val);
-  }
-  newMonthInput.value = '';
-  isEditing = true;
-  await selectMonth(val);
-});
-
 (async function init(){
   await loadConfig();
   await loadIndex();
@@ -947,10 +862,6 @@ addMonthBtn.addEventListener('click', async ()=>{
   }
   renderMonthList();
   renderMain();
-  initQRCode(); // 단일 QR 코드만 정상 노출되도록 초기화
-  
-  const now = new Date();
-  newMonthInput.value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
 })();
 </script>
 </body>
