@@ -5,8 +5,6 @@
 <title>Monthly HR Report Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-<!-- SheetJS 엑셀 파싱 라이브러리 -->
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <!-- Firebase (공유 저장소 + 관리자 로그인) -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -76,25 +74,6 @@
 
   .section-label{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--teal);font-weight:700;margin:0 0 16px;display:flex;align-items:center;gap:8px;}
   .section-label::after{content:"";flex:1;height:1px;background:var(--hair);}
-
-  .excel-upload-btn-main{
-    background: var(--paper);
-    border: 1px dashed var(--teal);
-    color: var(--teal);
-    border-radius: 6px;
-    padding: 6px 12px;
-    font-size: 12px;
-    font-weight: 700;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    transition: all 0.2s ease;
-  }
-  .excel-upload-btn-main:hover{
-    background: var(--teal-soft);
-    border-style: solid;
-  }
 
   .charts-grid{display:grid;grid-template-columns:repeat(auto-fit, minmax(320px,1fr));gap:18px;margin-bottom:34px;}
   .chart-card{background:var(--card);border:1px solid var(--hair);border-radius:10px;padding:20px;}
@@ -242,6 +221,8 @@
       </select>
     </div>
 
+    <div id="addMonthArea"></div>
+
     <div class="qr-card">
       <img src="Picture1.jpg" alt="ZIM" onError="this.onerror=null; this.src='picture1.jpg';" style="max-width: 100%; height: auto; display: block; border-radius: 6px;">
     </div>
@@ -276,7 +257,7 @@
    (Firebase 콘솔 > 프로젝트 설정 > 일반 > 내 앱 > SDK 설정 및 구성)
    ===================================================================== */
 const firebaseConfig = {
-  apiKey: "AIzaSyB0B1RU5xgPX_g5D9FvQWb45J8TQSTCMXs",
+  apiKey: "[REDACTED_GCP_API_KEY_1]",
   authDomain: "zim-korea-hr-monthly-update.firebaseapp.com",
   projectId: "zim-korea-hr-monthly-update",
   storageBucket: "zim-korea-hr-monthly-update.firebasestorage.app",
@@ -334,6 +315,36 @@ function updateAuthUI(){
   const link = document.getElementById('adminLoginLink');
   if(!link) return;
   link.textContent = isAdmin ? `Logout (${auth.currentUser.email})` : 'Admin Login';
+  renderAddMonthUI();
+}
+
+function renderAddMonthUI(){
+  const area = document.getElementById('addMonthArea');
+  if(!area) return;
+  if(!isAdmin){ area.innerHTML = ''; return; }
+
+  area.innerHTML = `
+    <div style="padding: 4px 0 14px;">
+      <label style="display: block; font-size: 12px; color: var(--slate); margin-bottom: 6px;">Add Month</label>
+      <div style="display:flex; gap:6px;">
+        <input type="month" id="newMonthInput" style="flex:1; background:#101722; border:1px solid #3A4557; color:#EDE9DF; border-radius:6px; padding:8px; font-size:13px;">
+        <button id="addMonthBtn" style="background:var(--amber); color:#1B2430; border:none; border-radius:6px; padding:0 14px; font-weight:700; cursor:pointer; font-size:13px;">+</button>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('addMonthBtn').onclick = async () => {
+    const val = document.getElementById('newMonthInput').value;
+    if(!val) return;
+    if(!months.includes(val)){
+      months.push(val);
+      months.sort().reverse();
+      await loadMonth(val);
+      await saveIndex();
+    }
+    renderMonthList();
+    await selectMonth(val);
+  };
 }
 
 document.getElementById('adminLoginLink').onclick = (e) => {
@@ -493,123 +504,8 @@ function setSaveStatus(text){
 }
 
 function toggleFormState(disabled){
-  const inputs = document.querySelectorAll('.main input, .main textarea, .main button:not(#editBtn):not(#saveBtn):not(#mainExcelUploadBtn)');
+  const inputs = document.querySelectorAll('.main input, .main textarea, .main button:not(#editBtn):not(#saveBtn)');
   inputs.forEach(el => { el.disabled = disabled; });
-}
-
-/* ---------- 엑셀 업로드 파싱 (관리자만 진입 가능) ---------- */
-async function handleCombinedExcelUpload(file) {
-  if(!isAdmin) return;
-  if (typeof XLSX === 'undefined') {
-    alert("엑셀 라이브러리가 준비되지 않았습니다.");
-    return;
-  }
-
-  const reader = new FileReader();
-  reader.onload = async function(e) {
-    try {
-      const data = new Uint8Array(e.target.result);
-      const workbook = XLSX.read(data, { type: 'array' });
-
-      let targetSheetName = workbook.SheetNames.find(name => name.toLowerCase().includes('forecast'));
-      if (!targetSheetName) targetSheetName = workbook.SheetNames[0];
-
-      const worksheet = workbook.Sheets[targetSheetName];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-
-      const row8 = jsonData[7] || [];
-      const row10 = jsonData[9] || [];
-
-      const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-      const targetYear = currentMonth ? currentMonth.split('-')[0] : '2026';
-
-      let monthCols = {};
-
-      for (let r = 0; r < jsonData.length; r++) {
-        if (!jsonData[r]) continue;
-        for (let c = 0; c < jsonData[r].length; c++) {
-          const cellVal = String(jsonData[r][c] || '').trim().toLowerCase();
-          for (let m = 1; m <= 12; m++) {
-            if (monthCols[m] !== undefined) continue;
-            const mShort = monthNames[m - 1];
-            if (cellVal === `${m}월` || cellVal === `${m}` || cellVal === mShort || cellVal.includes(mShort)) {
-              monthCols[m] = c;
-            }
-          }
-        }
-      }
-
-      function getVal(rowArray, monthNum) {
-        let rawVal = null;
-        const colIdx = monthCols[monthNum];
-        if (colIdx !== undefined && rowArray[colIdx] !== undefined) {
-          rawVal = rowArray[colIdx];
-        } else if (rowArray.length > 0) {
-          const numbers = rowArray.map(v => parseFloat(v)).filter(v => !isNaN(v));
-          if (numbers[monthNum - 1] !== undefined) rawVal = numbers[monthNum - 1];
-        }
-        const parsed = parseFloat(rawVal);
-        return isNaN(parsed) ? null : Math.round(parsed);
-      }
-
-      let importedMonths = [];
-
-      for (let m = 1; m <= 12; m++) {
-        const effValue = getVal(row8, m);
-        const hcValue = getVal(row10, m);
-
-        if (effValue !== null || hcValue !== null) {
-          const monthKey = `${targetYear}-${String(m).padStart(2, '0')}`;
-          if (!months.includes(monthKey)) months.push(monthKey);
-          if (!dataCache[monthKey]) await loadMonth(monthKey);
-
-          const dataObj = dataCache[monthKey];
-          const is2026 = monthKey.startsWith('2026');
-
-          config.topMetrics.forEach(metric => {
-            const isHc = metric.id === 'hc' || metric.label.toLowerCase().includes('headcount');
-            const isEff = metric.id === 'efficiency' || metric.label.toLowerCase().includes('efficiency');
-
-            if (isEff && effValue !== null) {
-              if (typeof dataObj.topValues[metric.id] === 'object' && 'actual' in dataObj.topValues[metric.id]) {
-                dataObj.topValues[metric.id].actual = effValue;
-                if (is2026 && !dataObj.topValues[metric.id].budget) dataObj.topValues[metric.id].budget = '116';
-              } else {
-                dataObj.topValues[metric.id] = { budget: is2026 ? '116' : '', actual: effValue };
-              }
-            }
-
-            if (isHc && hcValue !== null) {
-              if (typeof dataObj.topValues[metric.id] === 'object' && 'actual' in dataObj.topValues[metric.id]) {
-                dataObj.topValues[metric.id].actual = hcValue;
-                if (is2026 && !dataObj.topValues[metric.id].budget) dataObj.topValues[metric.id].budget = '84';
-              } else {
-                dataObj.topValues[metric.id] = { budget: is2026 ? '84' : '', actual: hcValue };
-              }
-            }
-          });
-
-          await saveMonth(monthKey);
-          importedMonths.push(MONTH_NAMES_ENG[m-1]);
-        }
-      }
-
-      months.sort().reverse();
-      await saveIndex();
-
-      if (importedMonths.length > 0) {
-        renderMonthList();
-        renderAllCharts();
-        alert(`[${targetSheetName}] 데이터가 성공적으로 가져와졌습니다! (${importedMonths.join(', ')})`);
-      } else {
-        alert(`'${targetSheetName}' 시트에서 데이터를 찾지 못했습니다.`);
-      }
-    } catch(err) {
-      console.error(err);
-      alert('엑셀 파일을 읽는 중 오류가 발생했습니다.');
-    }
-  };
-  reader.readAsArrayBuffer(file);
 }
 
 /* ---------- 렌더링 로직 ---------- */
@@ -658,11 +554,6 @@ function renderMain(){
     <button class="btn" id="saveBtn" style="background:var(--teal); color:#fff;">Save</button>
   ` : '';
 
-  const excelBtnHtml = isAdmin ? `
-    <button class="excel-upload-btn-main" id="mainExcelUploadBtn">📂 Excel Import</button>
-    <input type="file" id="mainExcelFileInput" accept=".xlsx, .xls, .csv" style="display:none;">
-  ` : '';
-
   mainEl.innerHTML = `
     <div class="main-header">
       <h2 class="main-title">${monthLabel(currentMonth)}</h2>
@@ -672,9 +563,8 @@ function renderMain(){
       </div>
     </div>
 
-    <div class="section-label" style="justify-content:space-between;">
+    <div class="section-label">
       <span>Monthly Trend (${startMonthEng} ~ ${curMonthEng} ${curYear})</span>
-      ${excelBtnHtml}
     </div>
 
     <div class="charts-grid" id="chartsGrid"></div>
@@ -696,15 +586,6 @@ function renderMain(){
         await saveMonth(currentMonth);
         isEditing = false;
         toggleFormState(true);
-      }
-    };
-
-    const uploadBtn = document.getElementById('mainExcelUploadBtn');
-    const fileInput = document.getElementById('mainExcelFileInput');
-    uploadBtn.onclick = () => fileInput.click();
-    fileInput.onchange = (e) => {
-      if(e.target.files.length > 0){
-        handleCombinedExcelUpload(e.target.files[0]);
       }
     };
   }
@@ -935,15 +816,31 @@ function renderAllCharts(){
     }).filter(p => p.actual !== null);
 
     const curMetricVal = getMetricValue(curData, metric);
-    const curActual = curMetricVal.actual !== null ? Math.round(curMetricVal.actual) : '-';
+    const curActualRaw = curData.topValues[metric.id] ? curData.topValues[metric.id].actual : '';
+    const curBudgetRaw = curData.topValues[metric.id] ? curData.topValues[metric.id].budget : '';
     const curBudget = curMetricVal.budget;
 
-    let badgeHtml = `
-      <div class="budget-badge-group">
-        <span class="budget-badge">Bdg: ${curBudget !== null ? curBudget : '-'}</span>
-        <span class="budget-badge actual">Act: ${curActual}</span>
-      </div>
-    `;
+    let badgeHtml;
+    if(isAdmin){
+      badgeHtml = `
+        <div class="budget-badge-group">
+          <label style="display:flex;align-items:center;gap:4px;">Bdg
+            <input type="number" class="metric-input" data-metric="${metric.id}" data-field="budget" value="${curBudgetRaw !== undefined ? curBudgetRaw : ''}" style="width:56px;padding:3px 5px;border:1px solid var(--hair);border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:11px;">
+          </label>
+          <label style="display:flex;align-items:center;gap:4px;">Act
+            <input type="number" class="metric-input" data-metric="${metric.id}" data-field="actual" value="${curActualRaw !== undefined ? curActualRaw : ''}" style="width:56px;padding:3px 5px;border:1px solid var(--hair);border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:11px;">
+          </label>
+        </div>
+      `;
+    } else {
+      const curActual = curMetricVal.actual !== null ? Math.round(curMetricVal.actual) : '-';
+      badgeHtml = `
+        <div class="budget-badge-group">
+          <span class="budget-badge">Bdg: ${curBudget !== null ? curBudget : '-'}</span>
+          <span class="budget-badge actual">Act: ${curActual}</span>
+        </div>
+      `;
+    }
 
     card.innerHTML = `
       <div class="chart-header">
@@ -955,6 +852,20 @@ function renderAllCharts(){
 
     container.appendChild(card);
   });
+
+  if(isAdmin){
+    container.querySelectorAll('.metric-input').forEach(inp => {
+      inp.oninput = (e) => {
+        const metricId = e.target.dataset.metric;
+        const field = e.target.dataset.field;
+        const val = e.target.value;
+        const dataObj = dataCache[currentMonth];
+        if(!dataObj.topValues[metricId]) dataObj.topValues[metricId] = { budget: '', actual: '' };
+        dataObj.topValues[metricId][field] = val;
+        queueSave(currentMonth);
+      };
+    });
+  }
 }
 
 /* ---------- 초기화 실행 (Firebase 로그인 상태 확정 후 실행) ---------- */
