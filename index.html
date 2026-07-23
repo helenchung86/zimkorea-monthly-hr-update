@@ -254,10 +254,13 @@
     <p class="brand-sub">HR Monthly Report</p>
 
     <div style="padding: 10px 0;">
-      <label for="monthSelect" style="display: block; font-size: 12px; color: var(--slate); margin-bottom: 6px;">Select Month</label>
-      <select id="monthSelect" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.15); font-size: 14px; outline: none; cursor: pointer;">
-      </select>
-    </div>
+  <label for="monthSelect" style="display: block; font-size: 12px; color: var(--slate); margin-bottom: 6px;">Select Month</label>
+  <div style="display:flex; gap:6px;">
+    <select id="monthSelect" style="flex:1; padding: 10px 12px; border-radius: 8px; background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.15); font-size: 14px; outline: none; cursor: pointer;">
+    </select>
+    <button id="deleteMonthBtn" title="Delete this month" style="display:none; background:var(--danger); color:#fff; border:none; border-radius:6px; padding:0 12px; font-weight:700; cursor:pointer; font-size:13px;">🗑</button>
+  </div>
+</div>
 
     <div id="addMonthArea"></div>
 
@@ -571,6 +574,41 @@ function renderMonthList(){
   selectEl.onchange = (e) => {
     selectMonth(e.target.value);
   };
+
+  const deleteBtn = document.getElementById('deleteMonthBtn');
+  if(deleteBtn){
+    deleteBtn.style.display = isAdmin ? 'block' : 'none';
+    deleteBtn.onclick = () => { if(currentMonth) deleteMonth(currentMonth); };
+  }
+}
+
+async function deleteMonth(m){
+  if(!isAdmin || !m) return;
+  const ok = confirm(`${monthLabel(m)} 리포트를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`);
+  if(!ok) return;
+
+  try{
+    await db.collection('reports').doc(m).delete();
+  }catch(e){
+    console.error('deleteMonth error', e);
+    alert('삭제 중 오류가 발생했습니다: ' + (e.message || e.code || e));
+    return;
+  }
+
+  months = months.filter(x => x !== m);
+  delete dataCache[m];
+  await saveIndex();
+
+  if(currentMonth === m){
+    currentMonth = months.length > 0 ? months[0] : null;
+  }
+
+  renderMonthList();
+  if(currentMonth){
+    await selectMonth(currentMonth);
+  } else {
+    renderMain();
+  }
 }
 
 async function selectMonth(m){
