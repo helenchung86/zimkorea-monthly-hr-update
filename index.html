@@ -198,6 +198,23 @@
   .add-img-btn:hover { border-color: var(--teal); color: var(--teal); }
 
   .preview-image{ cursor: zoom-in; }
+  .lightbox-overlay{
+    display:none;
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,0.85);
+    z-index:1000;
+    align-items:center;
+    justify-content:center;
+    cursor:zoom-out;
+  }
+  .lightbox-overlay img{
+    max-width:90vw;
+    max-height:90vh;
+    border-radius:8px;
+    box-shadow:0 20px 60px rgba(0,0,0,0.5);
+    cursor:default;
+  }
   .hover-zoom-overlay{
     position: fixed;
     z-index: 9999;
@@ -265,6 +282,11 @@
       </div>
       <p id="loginError"></p>
     </div>
+  </div>
+
+  <!-- 이미지 크게 보기 -->
+  <div class="lightbox-overlay" id="imageLightboxOverlay" onclick="closeImageLightbox()">
+    <img id="lightboxImg" onclick="event.stopPropagation()">
   </div>
 
   <div class="main" id="main">
@@ -723,6 +745,19 @@ function positionZoomOverlay(e){
   overlay.style.top = top + 'px';
 }
 
+function openImageLightbox(url){
+  document.getElementById('lightboxImg').src = url;
+  document.getElementById('imageLightboxOverlay').style.display = 'flex';
+}
+
+function closeImageLightbox(){
+  document.getElementById('imageLightboxOverlay').style.display = 'none';
+}
+
+document.addEventListener('keydown', (e) => {
+  if(e.key === 'Escape') closeImageLightbox();
+});
+
 function renderImagesForCategory(catKey){
   const gridEl = document.getElementById(`imgGrid-${catKey}`);
   if(!gridEl) return;
@@ -739,7 +774,7 @@ function renderImagesForCategory(catKey){
       src="${imgUrl}"
       alt="Attached snippet"
       class="preview-image"
-      onclick="window.open(this.src, '_blank')">
+      onclick="openImageLightbox(this.src)">
   ${isAdmin ? `<button class="img-del-btn" title="Delete image">×</button>` : ''}
 `;
     if(isAdmin){
