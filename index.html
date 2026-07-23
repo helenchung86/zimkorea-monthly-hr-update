@@ -531,6 +531,7 @@ async function saveMonth(m){
   }catch(e){
     console.error('saveMonth error', e);
     setSaveStatus('Save failed — try again');
+    alert('저장에 실패했습니다. 이미지 용량이 너무 크거나(1MB 제한) 네트워크 문제일 수 있어요.\n에러: ' + (e.message || e.code || e));
   }
 }
 
@@ -718,13 +719,30 @@ function handleImageUpload(catKey, inputEl){
     const file = inputEl.files[0];
     const reader = new FileReader();
     reader.onload = function(e){
-      const imgDataUrl = e.target.result;
-      const catData = dataCache[currentMonth].categories[catKey];
-      if(!catData.images) catData.images = [];
-      catData.images.push(imgDataUrl);
-      queueSave(currentMonth);
-      renderImagesForCategory(catKey);
-      inputEl.value = '';
+      const img = new Image();
+      img.onload = function(){
+        // 저장 용량 제한(Firestore 문서당 1MB)에 걸리지 않도록 이미지를 축소·압축
+        const maxDim = 900;
+        let w = img.width, h = img.height;
+        if(w > maxDim || h > maxDim){
+          if(w > h){ h = Math.round(h * maxDim / w); w = maxDim; }
+          else { w = Math.round(w * maxDim / h); h = maxDim; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+
+        const catData = dataCache[currentMonth].categories[catKey];
+        if(!catData.images) catData.images = [];
+        catData.images.push(compressedDataUrl);
+        queueSave(currentMonth);
+        renderImagesForCategory(catKey);
+        inputEl.value = '';
+      };
+      img.src = e.target.result;
     };
     reader.readAsDataURL(file);
   }
