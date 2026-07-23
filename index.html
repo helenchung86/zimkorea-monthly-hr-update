@@ -197,6 +197,27 @@
   }
   .add-img-btn:hover { border-color: var(--teal); color: var(--teal); }
 
+  .preview-image{ cursor: zoom-in; }
+  .hover-zoom-overlay{
+    position: fixed;
+    z-index: 9999;
+    pointer-events: none;
+    border: 1px solid var(--hair);
+    border-radius: 8px;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.3);
+    background: #fff;
+    padding: 6px;
+    max-width: 380px;
+    max-height: 380px;
+  }
+  .hover-zoom-overlay img{
+    display: block;
+    max-width: 368px;
+    max-height: 368px;
+    border-radius: 6px;
+    object-fit: contain;
+  }
+
   .hint{font-size:11px;color:var(--slate);margin:-4px 0 24px;}
 
   input:disabled, textarea:disabled, button:disabled {
@@ -257,7 +278,7 @@
    (Firebase 콘솔 > 프로젝트 설정 > 일반 > 내 앱 > SDK 설정 및 구성)
    ===================================================================== */
 const firebaseConfig = {
-  apiKey: "AIzaSyB0B1RU5xgPX_g5D9FvQWb45J8TQSTCMXs",
+  apiKey: "[REDACTED_GCP_API_KEY_1]",
   authDomain: "zim-korea-hr-monthly-update.firebaseapp.com",
   projectId: "zim-korea-hr-monthly-update",
   storageBucket: "zim-korea-hr-monthly-update.firebasestorage.app",
@@ -687,6 +708,21 @@ function handleImageUpload(catKey, inputEl){
   }
 }
 
+function positionZoomOverlay(e){
+  const overlay = document.getElementById('hoverZoomOverlay');
+  if(!overlay) return;
+  const offset = 18;
+  let left = e.clientX + offset;
+  let top = e.clientY + offset;
+  const maxLeft = window.innerWidth - 400;
+  const maxTop = window.innerHeight - 400;
+  if(left > maxLeft) left = e.clientX - offset - 380;
+  if(left < 0) left = 8;
+  if(top > maxTop) top = Math.max(8, maxTop);
+  overlay.style.left = left + 'px';
+  overlay.style.top = top + 'px';
+}
+
 function renderImagesForCategory(catKey){
   const gridEl = document.getElementById(`imgGrid-${catKey}`);
   if(!gridEl) return;
@@ -713,6 +749,23 @@ function renderImagesForCategory(catKey){
         renderImagesForCategory(catKey);
       };
     }
+
+    container.addEventListener('mouseenter', (e) => {
+      const overlay = document.createElement('div');
+      overlay.className = 'hover-zoom-overlay';
+      overlay.id = 'hoverZoomOverlay';
+      const bigImg = document.createElement('img');
+      bigImg.src = imgUrl;
+      overlay.appendChild(bigImg);
+      document.body.appendChild(overlay);
+      positionZoomOverlay(e);
+    });
+    container.addEventListener('mousemove', positionZoomOverlay);
+    container.addEventListener('mouseleave', () => {
+      const overlay = document.getElementById('hoverZoomOverlay');
+      if(overlay) overlay.remove();
+    });
+
     gridEl.appendChild(container);
   });
 }
