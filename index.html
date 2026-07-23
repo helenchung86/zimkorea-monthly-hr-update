@@ -7,8 +7,10 @@
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <!-- SheetJS 엑셀 파싱 라이브러리 -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<!-- QR 코드 생성 라이브러리 -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<!-- Firebase (공유 저장소 + 관리자 로그인) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <style>
   :root{
     --ink:#1B2430;
@@ -32,12 +34,7 @@
   .sidebar{width:260px;min-width:220px;background:var(--ink);color:#EDE9DF;display:flex;flex-direction:column;padding:28px 18px;}
   .brand{font-family:'Source Serif 4',serif;font-weight:700;font-size:20px;margin:0 0 2px 4px;}
   .brand-sub{font-size:12px;color:#9CA6B5;margin:0 0 22px 4px;}
-  .add-row{display:flex;gap:6px;margin-bottom:18px;}
-  .add-row input[type=month]{flex:1;background:#101722;border:1px solid #3A4557;color:#EDE9DF;border-radius:6px;padding:8px 8px;font-family:'JetBrains Mono',monospace;font-size:13px;}
-  .add-row button{background:var(--amber);color:#1B2430;border:none;border-radius:6px;padding:0 12px;font-weight:700;cursor:pointer;font-size:13px;}
-  .add-row button:hover{filter:brightness(1.08);}
-  
-  /* 좌측 하단 QR/로고 카드 영역 */
+
   .qr-card {
     background: #ffffff;
     border: 1px solid #3A4557;
@@ -50,6 +47,20 @@
     gap: 10px;
     margin-top: auto;
   }
+
+  .admin-auth-area{margin-top:12px;text-align:center;}
+  .admin-auth-area a{color:#9CA6B5;font-size:11px;text-decoration:underline;cursor:pointer;}
+  .admin-auth-area a:hover{color:#EDE9DF;}
+
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:999;align-items:center;justify-content:center;}
+  .modal-box{background:#fff;padding:24px;border-radius:10px;width:280px;}
+  .modal-box h3{margin:0 0 12px;font-family:'Source Serif 4',serif;}
+  .modal-box input{width:100%;margin-bottom:8px;padding:8px;border:1px solid #ccc;border-radius:6px;font-size:13px;}
+  .modal-btn-row{display:flex;gap:8px;margin-top:4px;}
+  .modal-btn-row button{flex:1;border:none;border-radius:6px;padding:8px;font-weight:600;cursor:pointer;font-size:13px;}
+  #loginSubmitBtn{background:var(--teal);color:#fff;}
+  #loginCancelBtn{background:#eee;color:var(--ink);}
+  #loginError{color:var(--danger);font-size:12px;margin-top:8px;display:none;}
 
   .main{flex:1;overflow-y:auto;padding:34px 42px 60px;}
   .empty-state{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;height:70%;color:var(--slate);}
@@ -85,19 +96,17 @@
     border-style: solid;
   }
 
-  /* 차트 영역 그리드 */
   .charts-grid{display:grid;grid-template-columns:repeat(auto-fit, minmax(320px,1fr));gap:18px;margin-bottom:34px;}
   .chart-card{background:var(--card);border:1px solid var(--hair);border-radius:10px;padding:20px;}
   .chart-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;}
   .chart-title{font-size:14px;font-weight:700;color:var(--ink);}
-  
+
   .budget-badge-group{display:flex;gap:6px;font-family:'JetBrains Mono',monospace;font-size:11px;}
   .budget-badge{background:var(--paper);border:1px solid var(--hair);padding:3px 8px;border-radius:5px;color:var(--slate);}
   .budget-badge.actual{background:var(--teal-soft);border-color:transparent;color:var(--teal);font-weight:700;}
 
   .chart-empty{color:var(--slate);font-size:12px;padding:30px 0;text-align:center;}
 
-  /* ===== MONTHLY Highlights 표 스타일 ===== */
   .highlights-table-wrap {
     background: var(--card);
     border: 1px solid var(--hair);
@@ -155,7 +164,6 @@
   }
   .summary-textarea:focus { outline: none; border-color: var(--teal); }
 
-  /* 이미지 첨부 영역 */
   .image-attach-area {
     margin-top: 10px;
   }
@@ -223,31 +231,68 @@
 </head>
 <body>
 <div class="app">
-  <!-- 사이드바 시작 -->
+  <!-- 사이드바 -->
   <div class="sidebar">
     <p class="brand">ZIM Korea</p>
     <p class="brand-sub">HR Monthly Report</p>
-    
+
     <div style="padding: 10px 0;">
       <label for="monthSelect" style="display: block; font-size: 12px; color: var(--slate); margin-bottom: 6px;">Select Month</label>
       <select id="monthSelect" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.15); font-size: 14px; outline: none; cursor: pointer;">
       </select>
     </div>
 
-    <!-- 로고 카드 -->
     <div class="qr-card">
       <img src="Picture1.jpg" alt="ZIM" onError="this.onerror=null; this.src='picture1.jpg';" style="max-width: 100%; height: auto; display: block; border-radius: 6px;">
-    </div>  
-  </div>
-  <!-- 사이드바 끝 (태그 닫힘 보완) -->
+    </div>
 
-  <!-- 메인 컨텐츠 시작 -->
+    <div class="admin-auth-area">
+      <a id="adminLoginLink">Admin Login</a>
+    </div>
+  </div>
+
+  <!-- 로그인 모달 -->
+  <div class="modal-overlay" id="loginModalOverlay">
+    <div class="modal-box">
+      <h3>Admin Login</h3>
+      <input type="email" id="loginEmail" placeholder="Email">
+      <input type="password" id="loginPassword" placeholder="Password">
+      <div class="modal-btn-row">
+        <button id="loginSubmitBtn">Login</button>
+        <button id="loginCancelBtn">Cancel</button>
+      </div>
+      <p id="loginError"></p>
+    </div>
+  </div>
+
   <div class="main" id="main">
     <div class="empty-state"><h2>Loading…</h2></div>
   </div>
 </div>
 
 <script>
+/* =====================================================================
+   Firebase 설정 — 반드시 본인 Firebase 프로젝트 값으로 교체하세요.
+   (Firebase 콘솔 > 프로젝트 설정 > 일반 > 내 앱 > SDK 설정 및 구성)
+   ===================================================================== */
+const firebaseConfig = {
+  apiKey: "[REDACTED_GCP_API_KEY_1]",
+  authDomain: "zim-korea-hr-monthly-update.firebaseapp.com",
+  projectId: "zim-korea-hr-monthly-update",
+  storageBucket: "zim-korea-hr-monthly-update.firebasestorage.app",
+  messagingSenderId: "467109154730",
+  appId: "1:467109154730:web:f3f1e925ae60edfe14e5d3"
+};
+
+// 관리자로 인정할 이메일 (Firebase Authentication에 이 이메일로 계정을 만드세요)
+const ADMIN_EMAIL = "[REDACTED_EMAIL_ADDRESS_1]";
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+/* ===================================================================== */
+
 const mainEl = document.getElementById('main');
 
 let months = [];
@@ -255,6 +300,8 @@ let dataCache = {};
 let currentMonth = null;
 let saveTimer = null;
 let isEditing = true;
+let isAdmin = false;
+let authInitDone = false;
 
 const MONTH_NAMES_ENG = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
 
@@ -282,33 +329,79 @@ function escapeHtml(str){
   return div.innerHTML;
 }
 
-/* ---------- LocalStorage 저장소 ---------- */
+/* ---------- 로그인 UI ---------- */
+function updateAuthUI(){
+  const link = document.getElementById('adminLoginLink');
+  if(!link) return;
+  link.textContent = isAdmin ? `Logout (${auth.currentUser.email})` : 'Admin Login';
+}
+
+document.getElementById('adminLoginLink').onclick = (e) => {
+  e.preventDefault();
+  if(isAdmin){
+    auth.signOut();
+  } else {
+    document.getElementById('loginError').style.display = 'none';
+    document.getElementById('loginModalOverlay').style.display = 'flex';
+  }
+};
+document.getElementById('loginCancelBtn').onclick = () => {
+  document.getElementById('loginModalOverlay').style.display = 'none';
+};
+document.getElementById('loginSubmitBtn').onclick = async () => {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pw = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginError');
+  try{
+    await auth.signInWithEmailAndPassword(email, pw);
+    document.getElementById('loginModalOverlay').style.display = 'none';
+    document.getElementById('loginEmail').value = '';
+    document.getElementById('loginPassword').value = '';
+  }catch(err){
+    errEl.textContent = '로그인 실패: 이메일/비밀번호를 확인하세요.';
+    errEl.style.display = 'block';
+  }
+};
+
+auth.onAuthStateChanged(async (user) => {
+  isAdmin = !!(user && user.email === ADMIN_EMAIL);
+  updateAuthUI();
+  if(!authInitDone){
+    authInitDone = true;
+    await init();
+  } else {
+    isEditing = isAdmin;
+    if(currentMonth) renderMain();
+  }
+});
+
+/* ---------- Firestore 저장소 ---------- */
 async function loadConfig(){
   try{
-    const res = localStorage.getItem('config');
-    if(res){
-      const parsed = JSON.parse(res);
+    const doc = await db.collection('meta').doc('config').get();
+    if(doc.exists){
+      const parsed = doc.data();
       if(parsed.topMetrics && parsed.categories) config = parsed;
     }
-  }catch(e){ }
+  }catch(e){ console.error('loadConfig error', e); }
 }
 
 async function loadIndex(){
   try{
-    const res = localStorage.getItem('months-index');
-    months = res ? JSON.parse(res) : [];
+    const doc = await db.collection('meta').doc('index').get();
+    months = (doc.exists && doc.data().months) ? doc.data().months : [];
   }catch(e){ months = []; }
-  
-  // 기본 목록이 없으면 2026-07로 세팅
+
   if(months.length === 0){
     months = ['2026-07'];
-    await saveIndex();
+    if(isAdmin) await saveIndex();
   }
   months.sort().reverse();
 }
 
 async function saveIndex(){
-  try{ localStorage.setItem('months-index', JSON.stringify(months)); }catch(e){}
+  if(!isAdmin) return;
+  try{ await db.collection('meta').doc('index').set({ months }); }catch(e){ console.error('saveIndex error', e); }
 }
 
 function freshMonthData(monthKey){
@@ -338,7 +431,7 @@ function normalizeMonthData(raw, monthKey){
   const data = raw ? JSON.parse(JSON.stringify(raw)) : {};
   data.topValues = data.topValues || {};
   data.categories = data.categories || {};
-  
+
   const is2026 = monthKey && monthKey.startsWith('2026');
 
   config.topMetrics.forEach(m=>{
@@ -365,25 +458,29 @@ function normalizeMonthData(raw, monthKey){
 async function loadMonth(m){
   if(dataCache[m]) return dataCache[m];
   try{
-    const res = localStorage.getItem('report:'+m);
-    const parsed = res ? JSON.parse(res) : null;
+    const doc = await db.collection('reports').doc(m).get();
+    const parsed = doc.exists ? doc.data() : null;
     dataCache[m] = normalizeMonthData(parsed, m);
   }catch(e){
+    console.error('loadMonth error', e);
     dataCache[m] = freshMonthData(m);
   }
   return dataCache[m];
 }
 
 async function saveMonth(m){
+  if(!isAdmin){ setSaveStatus('View only'); return; }
   try{
-    localStorage.setItem('report:'+m, JSON.stringify(dataCache[m]));
+    await db.collection('reports').doc(m).set(dataCache[m]);
     setSaveStatus('Saved · ' + new Date().toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'}));
   }catch(e){
+    console.error('saveMonth error', e);
     setSaveStatus('Save failed — try again');
   }
 }
 
 function queueSave(m){
+  if(!isAdmin) return;
   setSaveStatus('Saving…');
   clearTimeout(saveTimer);
   saveTimer = setTimeout(()=>{ saveMonth(m); }, 600);
@@ -396,13 +493,12 @@ function setSaveStatus(text){
 
 function toggleFormState(disabled){
   const inputs = document.querySelectorAll('.main input, .main textarea, .main button:not(#editBtn):not(#saveBtn):not(#mainExcelUploadBtn)');
-  inputs.forEach(el => {
-    el.disabled = disabled;
-  });
+  inputs.forEach(el => { el.disabled = disabled; });
 }
 
-/* ---------- 엑셀 업로드 파싱 ---------- */
+/* ---------- 엑셀 업로드 파싱 (관리자만 진입 가능) ---------- */
 async function handleCombinedExcelUpload(file) {
+  if(!isAdmin) return;
   if (typeof XLSX === 'undefined') {
     alert("엑셀 라이브러리가 준비되지 않았습니다.");
     return;
@@ -413,16 +509,16 @@ async function handleCombinedExcelUpload(file) {
     try {
       const data = new Uint8Array(e.target.result);
       const workbook = XLSX.read(data, { type: 'array' });
-      
+
       let targetSheetName = workbook.SheetNames.find(name => name.toLowerCase().includes('forecast'));
       if (!targetSheetName) targetSheetName = workbook.SheetNames[0];
-      
+
       const worksheet = workbook.Sheets[targetSheetName];
       const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-      
+
       const row8 = jsonData[7] || [];
       const row10 = jsonData[9] || [];
-      
+
       const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
       const targetYear = currentMonth ? currentMonth.split('-')[0] : '2026';
 
@@ -508,6 +604,7 @@ async function handleCombinedExcelUpload(file) {
         alert(`'${targetSheetName}' 시트에서 데이터를 찾지 못했습니다.`);
       }
     } catch(err) {
+      console.error(err);
       alert('엑셀 파일을 읽는 중 오류가 발생했습니다.');
     }
   };
@@ -518,7 +615,7 @@ async function handleCombinedExcelUpload(file) {
 function renderMonthList(){
   const selectEl = document.getElementById('monthSelect');
   if(!selectEl || !months || months.length === 0) return;
-  
+
   selectEl.innerHTML = '';
   months.forEach(m => {
     const opt = document.createElement('option');
@@ -555,58 +652,66 @@ function renderMain(){
   const startMonthEng = MONTH_NAMES_ENG[0];
   const curMonthEng = MONTH_NAMES_ENG[parseInt(curMonthNum, 10) - 1];
 
+  const editControlsHtml = isAdmin ? `
+    <button class="btn btn-ghost" id="editBtn">Edit</button>
+    <button class="btn" id="saveBtn" style="background:var(--teal); color:#fff;">Save</button>
+  ` : '';
+
+  const excelBtnHtml = isAdmin ? `
+    <button class="excel-upload-btn-main" id="mainExcelUploadBtn">📂 Excel Import</button>
+    <input type="file" id="mainExcelFileInput" accept=".xlsx, .xls, .csv" style="display:none;">
+  ` : '';
+
   mainEl.innerHTML = `
     <div class="main-header">
       <h2 class="main-title">${monthLabel(currentMonth)}</h2>
       <div class="save-area">
-        <span class="save-status">${isEditing ? 'Editing…' : 'Saved'}</span>
-        <button class="btn btn-ghost" id="editBtn">Edit</button>
-        <button class="btn" id="saveBtn" style="background:var(--teal); color:#fff;">Save</button>
+        <span class="save-status">${isAdmin ? (isEditing ? 'Editing…' : 'Saved') : 'View only'}</span>
+        ${editControlsHtml}
       </div>
     </div>
 
     <div class="section-label" style="justify-content:space-between;">
       <span>Monthly Trend (${startMonthEng} ~ ${curMonthEng} ${curYear})</span>
-      <button class="excel-upload-btn-main" id="mainExcelUploadBtn">
-        📂 Excel Import
-      </button>
-      <input type="file" id="mainExcelFileInput" accept=".xlsx, .xls, .csv" style="display:none;">
+      ${excelBtnHtml}
     </div>
 
     <div class="charts-grid" id="chartsGrid"></div>
 
     <p class="section-label">MONTHLY Highlights</p>
     <div id="highlightsTableArea"></div>
-    <p class="hint">Click Edit to make changes. Click Save when finished to lock inputs.</p>
+    <p class="hint">${isAdmin ? 'Click Edit to make changes. Click Save when finished to lock inputs.' : 'This report is read-only. Contact HR to request changes.'}</p>
   `;
 
-  document.getElementById('editBtn').onclick = () => {
-    isEditing = true;
-    toggleFormState(false);
-    setSaveStatus('Editing…');
-  };
+  if(isAdmin){
+    document.getElementById('editBtn').onclick = () => {
+      isEditing = true;
+      toggleFormState(false);
+      setSaveStatus('Editing…');
+    };
 
-  document.getElementById('saveBtn').onclick = async () => {
-    if (currentMonth) {
-      await saveMonth(currentMonth);
-      isEditing = false;
-      toggleFormState(true);
-    }
-  };
+    document.getElementById('saveBtn').onclick = async () => {
+      if (currentMonth) {
+        await saveMonth(currentMonth);
+        isEditing = false;
+        toggleFormState(true);
+      }
+    };
 
-  const uploadBtn = document.getElementById('mainExcelUploadBtn');
-  const fileInput = document.getElementById('mainExcelFileInput');
-  uploadBtn.onclick = () => fileInput.click();
-  fileInput.onchange = (e) => {
-    if(e.target.files.length > 0){
-      handleCombinedExcelUpload(e.target.files[0]);
-    }
-  };
+    const uploadBtn = document.getElementById('mainExcelUploadBtn');
+    const fileInput = document.getElementById('mainExcelFileInput');
+    uploadBtn.onclick = () => fileInput.click();
+    fileInput.onchange = (e) => {
+      if(e.target.files.length > 0){
+        handleCombinedExcelUpload(e.target.files[0]);
+      }
+    };
+  }
 
   renderHighlightsTable();
   renderAllCharts();
 
-  if(!isEditing) {
+  if(!isAdmin || !isEditing) {
     toggleFormState(true);
   }
 }
@@ -641,11 +746,13 @@ function renderHighlightsTable(){
           <div class="cat-header-sub">${escapeHtml(c.full)}</div>
         </td>
         <td>
-          <textarea class="summary-textarea" placeholder="Enter key accomplishments or notes for ${escapeHtml(c.short)}..." oninput="updateSummary('${c.key}', this.value)">${escapeHtml(catData.summary)}</textarea>
-          
+          <textarea class="summary-textarea" ${isAdmin ? '' : 'disabled'} placeholder="Enter key accomplishments or notes for ${escapeHtml(c.short)}..." oninput="updateSummary('${c.key}', this.value)">${escapeHtml(catData.summary)}</textarea>
+
           <div class="image-attach-area">
-            <button class="add-img-btn" onclick="triggerImgUpload('${c.key}')">📷 Add Image</button>
-            <input type="file" id="imgInput-${c.key}" accept="image/*" style="display:none;" onchange="handleImageUpload('${c.key}', this)">
+            ${isAdmin ? `
+              <button class="add-img-btn" onclick="triggerImgUpload('${c.key}')">📷 Add Image</button>
+              <input type="file" id="imgInput-${c.key}" accept="image/*" style="display:none;" onchange="handleImageUpload('${c.key}', this)">
+            ` : ''}
             <div class="img-grid" id="imgGrid-${c.key}"></div>
           </div>
         </td>
@@ -667,6 +774,7 @@ function renderHighlightsTable(){
 }
 
 function updateSummary(catKey, val){
+  if(!isAdmin) return;
   const catData = dataCache[currentMonth].categories[catKey];
   catData.summary = val;
   queueSave(currentMonth);
@@ -674,11 +782,13 @@ function updateSummary(catKey, val){
 
 /* ---------- 이미지 관리 ---------- */
 function triggerImgUpload(catKey){
+  if(!isAdmin) return;
   const input = document.getElementById(`imgInput-${catKey}`);
   if(input) input.click();
 }
 
 function handleImageUpload(catKey, inputEl){
+  if(!isAdmin) return;
   if(inputEl.files && inputEl.files[0]){
     const file = inputEl.files[0];
     const reader = new FileReader();
@@ -712,13 +822,15 @@ function renderImagesForCategory(catKey){
       alt="Attached snippet"
       class="preview-image"
       onclick="window.open(this.src, '_blank')">
-  <button class="img-del-btn" title="Delete image">×</button>
+  ${isAdmin ? `<button class="img-del-btn" title="Delete image">×</button>` : ''}
 `;
-    container.querySelector('.img-del-btn').onclick = () => {
-      catData.images.splice(index, 1);
-      queueSave(currentMonth);
-      renderImagesForCategory(catKey);
-    };
+    if(isAdmin){
+      container.querySelector('.img-del-btn').onclick = () => {
+        catData.images.splice(index, 1);
+        queueSave(currentMonth);
+        renderImagesForCategory(catKey);
+      };
+    }
     gridEl.appendChild(container);
   });
 }
@@ -752,12 +864,12 @@ function renderSingleChartSVG(points, currentBudget){
 
   const allVals = points.map(p=>p.actual).concat(currentBudget !== null ? [currentBudget] : []);
   const max = Math.max(...allVals, 0.0001);
-  
+
   const w = 340, h = 150, padL = 10, padB = 22;
   const count = points.length;
   const barGap = count > 8 ? 4 : 8;
   const barW = Math.max(10, (w - padL*2 - barGap*(count-1)) / count);
-  
+
   let x = padL;
   let bars = '';
   let labels = '';
@@ -779,11 +891,11 @@ function renderSingleChartSVG(points, currentBudget){
     const y = h - padB - barH;
     const mIdx = parseInt(p.month.split('-')[1], 10) - 1;
     const mEng = MONTH_NAMES_ENG[mIdx];
-    
+
     bars += `<rect x="${x}" y="${y}" width="${barW}" height="${barH}" rx="2" fill="var(--teal)"></rect>`;
     bars += `<text x="${x + barW/2}" y="${y - 3}" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="${actualFontSize}" font-weight="700" fill="#2F6F6C">${Math.round(p.actual)}</text>`;
     labels += `<text x="${x + barW/2}" y="${h - 5}" text-anchor="middle" font-family="Inter, sans-serif" font-size="${monthFontSize}" font-weight="600" fill="#6B7280">${mEng}</text>`;
-    
+
     x += barW + barGap;
   });
 
@@ -803,6 +915,7 @@ function renderAllCharts(){
   const [targetYear, targetMonthStr] = currentMonth.split('-');
   const targetMonthNum = parseInt(targetMonthStr, 10);
 
+  // 1월 ~ 선택된 월까지만 표시
   const filteredMonths = [];
   for(let m = 1; m <= targetMonthNum; m++){
     const mKey = `${targetYear}-${String(m).padStart(2, '0')}`;
@@ -843,23 +956,23 @@ function renderAllCharts(){
   });
 }
 
-/* ---------- 초기화 실행 ---------- */
-(async function init(){
+/* ---------- 초기화 실행 (Firebase 로그인 상태 확정 후 실행) ---------- */
+async function init(){
   await loadConfig();
   await loadIndex();
   await ensureAllMonthsLoaded();
-  
+
   if(months.length > 0){
     currentMonth = months[0];
   }
-  
+
   renderMonthList();
   if(currentMonth) {
     await selectMonth(currentMonth);
   } else {
     renderMain();
   }
-})();
+}
 </script>
 </body>
 </html>
