@@ -358,6 +358,15 @@ function escapeHtml(str){
   return div.innerHTML;
 }
 
+function fmtNum(n, decimals){
+  decimals = decimals || 0;
+  if(n === null || n === undefined || isNaN(n)) return '-';
+  return Number(n).toLocaleString('en-US', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals
+  });
+}
+
 /* ---------- 로그인 UI ---------- */
 function updateAuthUI(){
   const link = document.getElementById('adminLoginLink');
@@ -909,7 +918,7 @@ function renderSingleChartSVG(points, currentBudget){
     const budgetY = h - padB - (currentBudget / max) * (h - padB - 28);
     budgetLine = `
       <line x1="${padL - 2}" y1="${budgetY}" x2="${w - padL + 2}" y2="${budgetY}" stroke="#B8862E" stroke-width="1.2" stroke-dasharray="3,3" opacity="0.85"></line>
-      <text x="${w - padL}" y="${budgetY - 3}" text-anchor="end" font-family="JetBrains Mono, monospace" font-size="8" font-weight="700" fill="#B8862E">Bdg ${currentBudget}</text>
+      <text x="${w - padL}" y="${budgetY - 3}" text-anchor="end" font-family="JetBrains Mono, monospace" font-size="8" font-weight="700" fill="#B8862E">Bdg ${fmtNum(currentBudget, 0)}</text>
     `;
   }
 
@@ -923,7 +932,7 @@ function renderSingleChartSVG(points, currentBudget){
     const mEng = MONTH_NAMES_ENG[mIdx];
 
     bars += `<rect x="${x}" y="${y}" width="${barW}" height="${barH}" rx="2" fill="var(--teal)"></rect>`;
-    bars += `<text x="${x + barW/2}" y="${y - 3}" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="${actualFontSize}" font-weight="700" fill="#2F6F6C">${Math.round(p.actual)}</text>`;
+    bars += `<text x="${x + barW/2}" y="${y - 3}" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="${actualFontSize}" font-weight="700" fill="#2F6F6C">${fmtNum(p.actual, 0)}</text>`;
     labels += `<text x="${x + barW/2}" y="${h - 5}" text-anchor="middle" font-family="Inter, sans-serif" font-size="${monthFontSize}" font-weight="600" fill="#6B7280">${mEng}</text>`;
 
     x += barW + barGap;
@@ -981,10 +990,10 @@ function renderAllCharts(){
         </div>
       `;
     } else {
-      const curActual = curMetricVal.actual !== null ? Math.round(curMetricVal.actual) : '-';
+      const curActual = fmtNum(curMetricVal.actual, 0);
       badgeHtml = `
         <div class="budget-badge-group">
-          <span class="budget-badge">Bdg: ${curBudget !== null ? curBudget : '-'}</span>
+          <span class="budget-badge">Bdg: ${fmtNum(curBudget, 0)}</span>
           <span class="budget-badge actual">Act: ${curActual}</span>
         </div>
       `;
