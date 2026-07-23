@@ -26,7 +26,7 @@
     --good:#2F6F6C;
   }
   *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;height:100%;background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;}
+  html,body{margin:0;padding:0;height:100%;background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;zoom:150%;}
   .app{display:flex;height:100vh;min-height:560px;}
 
   .sidebar{width:260px;min-width:220px;background:var(--ink);color:#EDE9DF;display:flex;flex-direction:column;padding:28px 18px;}
@@ -337,7 +337,7 @@ let config = {
     { id: 'hc', label: 'Headcount (HC)', type: 'budget_actual' },
     { id: 'efficiency', label: 'Efficiency (%)', type: 'budget_actual' },
     { id: 'overtime', label: 'Overtime (hrs)', type: 'budget_actual' },
-    { id: 'budgetUsage', label: 'Budget (USD)', type: 'budget_actual' }
+    { id: 'budgetUsage', label: 'Budget (Accumulate, USD)', type: 'budget_actual' }
   ],
   categories: [
     { key: 'cb', short: 'C&B', full: 'Compensation & Benefits' },
