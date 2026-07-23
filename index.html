@@ -358,7 +358,8 @@ document.getElementById('loginSubmitBtn').onclick = async () => {
     document.getElementById('loginEmail').value = '';
     document.getElementById('loginPassword').value = '';
   }catch(err){
-    errEl.textContent = '로그인 실패: 이메일/비밀번호를 확인하세요.';
+    console.error('로그인 에러:', err);
+    errEl.textContent = '로그인 실패 (' + (err.code || 'unknown') + '): ' + (err.message || '');
     errEl.style.display = 'block';
   }
 };
